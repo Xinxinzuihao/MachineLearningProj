@@ -1,0 +1,92 @@
+---
+title: "Practical Machine Learning Project"
+author: "Cindy"
+date: "Sunday, February 28, 2016"
+output: html_document
+---
+#Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement ??? a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#Data Details
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: 
+              exactly according to the specification (Class A), 
+              throwing the elbows to the front (Class B), 
+              lifting the dumbbell only halfway (Class C), 
+              lowering the dumbbell only halfway (Class D) and 
+              throwing the hips to the front (Class E).
+
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. 
+Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were supposed to simulate. 
+The exercises were performed by six male participants aged between 20-28 years, with little weight lifting experience. 
+We made sure that all participants could easily simulate the mistakes in a safe and controlled manner by using a relatively light dumbbell (1.25kg).
+
+#Data Analysis
+Load package:
+```{r,echo=FALSE}
+library(caret)
+library(rpart) 
+library(rpart.plot)
+library(rattle)
+library(randomForest)
+```
+
+Read data from URL provided and change missing data to the same format:
+```{r}
+urlTrain = "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+urlTest = "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+train = read.csv(url(urlTrain), na.strings=c("NA","#DIV/0!",""))
+test = read.csv(url(urlTest), na.strings=c("NA","#DIV/0!",""))
+dim(train)
+dim(test)
+```
+
+Clean data in training dataset:
+
+1. remove the first 7 columns since not used for model, 153 column left.
+
+```{r}
+train=train[,-c(1:7)]
+```
+
+2. Remove variables with 50% more missing value, 60 columns left.
+```{r}
+NAPerc=sapply(colnames(train), 
+       function(x) if(sum(is.na(train[, x])) > 0.50*nrow(train)) {return(TRUE)}else{return(FALSE)}
+       )
+train=train[, !NAPerc]
+```
+
+Partition the training data into a new training and testing data by 0.6 and 0.4.
+Cross-validation will be performed by subsampling our training data set randomly without replacement into: NewTrain data (60% of the original Training data set) and NewTest data (40% of the original Training data set). Our models will be fitted on the NewTraining data set, and tested on the NewTesting data. Once the most accurate model is chosen, it will be tested on the original Testing data set.
+The set.seed function is for the reproducibility. Same records will be assigned to the training and testing datasets if the code is to be run again.
+```{r}
+set.seed(123)
+PartTrain=createDataPartition(y=train$classe, p=0.6, list=FALSE)
+NewTrain = train[PartTrain, ]
+NewTest = train[-PartTrain, ]
+```
+
+Decision Tree and Random Forest is built and plotted:
+```{r}
+dtModel=rpart(classe ~. , data=NewTrain, method="class")
+fancyRpartPlot(dtModel)
+rfModel = randomForest(classe ~. , data=NewTrain, method="class")
+```
+Test Decision Tree and Random Forest on the "New" testing data:
+```{r}
+dtpredNewTest= predict(dtModel, NewTest, type = "class")
+confusionMatrix(dtpredNewTest, NewTest$classe)
+
+rfpredNewTest= predict(rfModel, NewTest, type = "class")
+confusionMatrix(rfpredNewTest, NewTest$classe)
+```
+
+#Conclusion and Prediction
+Random Forest performs better with 0.9941 accuracy.
+Make predictions for test data using Random Forest model:
+```{r}
+predRF = predict(rfModel, test, type = "class")
+predRF
+```
+
+
